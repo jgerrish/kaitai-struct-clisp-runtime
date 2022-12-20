@@ -109,7 +109,7 @@
    (defvar my-test-pos 3)
    (defun set-pos (p) (setf my-test-pos p))
    (defun get-pos () my-test-pos)
-   (print (peek-read #'get-pos #'set-pos (progn (print "start") (print my-test-pos) (setf my-test-pos (1+ my-test-pos)) (print "end") (print my-test-pos) 3)))
+   (print (peek-read #'get-pos #'set-pos (progn (print \"start\") (print my-test-pos) (setf my-test-pos (1+ my-test-pos)) (print \"end\") (print my-test-pos) 3)))
 
    Example with a kaitai-struct:
 
