@@ -39,7 +39,7 @@
    Example:
 
    (kaitai-struct:kaitai-stream-read ks 'read-u2le)"
-  (funcall read-fun (slot-value ks 'kaitai-struct::ks)))
+  (funcall read-fun (slot-value ks 'ks)))
 
 
 (defmethod dirty-slot-p ((ks kaitai-struct) slot)
@@ -121,26 +121,26 @@
 
    (defun get-pos () (pos (slot-value my-ks 'ks)))
    (defun set-pos (p) (seek (slot-value my-ks 'ks) p))
-   (register-attribute my-ks 'iamge-width
-                  (peek-read #'get-pos #'set-pos
-                    (read-u2le (slot-value my-ks 'ks))))
+   (register-attribute my-ks 'image-width
+                  #'(lambda () (peek-read #'get-pos #'set-pos
+                               (read-u2le (slot-value my-ks 'ks)))))
    (read-attribute my-ks 'image-width)
    (pos (slot-value my-ks 'ks))"
   (with-gensyms (saved-pos return-value)
     `(let ((,saved-pos (funcall ,pos-fun)))
-      (let ((,return-value (progn ,@body)))
-        (funcall ,seek-fun ,saved-pos)
-	,return-value))))
+       (let ((,return-value (progn ,@body)))
+         (funcall ,seek-fun ,saved-pos)
+	 ,return-value))))
 
 (defmethod peek-reader-builder ((ks kaitai-struct) read-fun)
   "Build a reader function to read in data.
    This uses peek-read to save and restore stream position.
 
    Example:
-   (register-attribute ks 'image-width
-     (setf (slot-value ks 'image-width) (peek-reader-builder ks 'read-u2le)))"
+   (register-attribute my-ks 'image-width
+     (setf (slot-value my-ks 'image-width) (peek-reader-builder my-ks 'read-u2le)))"
   (lambda ()
     (peek-read
-	#'(lambda () (kaitai-stream:pos (slot-value ks 'ks)))
-	#'(lambda (p) (kaitai-stream:seek (slot-value ks 'ks) p))
+	#'(lambda () (pos (slot-value ks 'ks)))
+	#'(lambda (p) (seek (slot-value ks 'ks) p))
       (funcall read-fun (slot-value ks 'ks)))))

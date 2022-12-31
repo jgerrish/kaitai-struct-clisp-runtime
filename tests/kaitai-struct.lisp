@@ -46,15 +46,15 @@
 	 (kfs (make-instance 'kaitai-file-stream :io in))
 	 (kbs (make-instance 'kaitai-byte-stream
 			     :data #(#X01 #X02 #X03)))
-	 (kf-struct (make-instance 'kaitai-struct :stream kfs))
-	 (kb-struct (make-instance 'kaitai-struct :stream kbs)))
+	 (kf-struct (make-instance 'fake-image :stream kfs))
+	 (kb-struct (make-instance 'fake-image :stream kbs)))
     (funcall helper kf-struct)
     (funcall helper kb-struct)))
 
 
 (defun test-bytes-01-08-file (helper)
-  "Test that attribute readers can be registered and used.
-   Tests reading two attributes"
+  "Build test streams and run a set of tests on an eight-byte file
+   containing 0x01-0x08"
   (let* ((filename
 	   (asdf:system-relative-pathname
 	    "kaitai-struct-clisp-runtime/tests"
@@ -63,6 +63,23 @@
 	 (kfs (make-instance 'kaitai-file-stream :io in))
 	 (kbs (make-instance 'kaitai-byte-stream
 			     :data #(#X01 #X02 #X03 #X04 #X05 #X06 #X07 #X08)))
+	 (kf-struct (make-instance 'fake-image :stream kfs))
+	 (kb-struct (make-instance 'fake-image :stream kbs)))
+    (funcall helper kf-struct)
+    (funcall helper kb-struct)))
+
+(defun test-bytes-hello-world-file (helper)
+  "Build test streams and run a set of tests on an eight-byte file
+   containing Hello, World!"
+  (let* ((filename
+	   (asdf:system-relative-pathname
+	    "kaitai-struct-clisp-runtime/tests"
+	    "tests/test-bytes-hello-world.bin"))
+	 (in (open filename :direction :input :element-type '(unsigned-byte 8)))
+	 (kfs (make-instance 'kaitai-file-stream :io in))
+	 (kbs (make-instance 'kaitai-byte-stream
+			     :data #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F
+				     #X72 #X6C #X64 #X21)))
 	 (kf-struct (make-instance 'fake-image :stream kfs))
 	 (kb-struct (make-instance 'fake-image :stream kbs)))
     (funcall helper kf-struct)
@@ -151,20 +168,10 @@
       (testing "test-kaitai-struct-read-attribute image-height should get position correctly"
 	(ok (= (kaitai-stream:pos (slot-value ks 'kaitai-struct::ks)) 4))))))
 
-;; Test using peek-read in an attribute reader
+;; Tests using peek-read in an attribute reader
 ;; Builds the attribute reader with peek-reader-builder
 (deftest test-kaitai-struct-peek-reader-builder
-  (let* ((filename
-	   (asdf:system-relative-pathname
-	    "kaitai-struct-clisp-runtime/tests"
-	    "tests/test-bytes-01-03.bin"))
-	 (in (open filename :direction :input :element-type '(unsigned-byte 8)))
-	 (kfs (make-instance 'kaitai-file-stream :io in))
-	 (kbs (make-instance 'kaitai-byte-stream :data #(#X01 #X02 #X03)))
-	 (kf-struct (make-instance 'fake-image :stream kfs))
-	 (kb-struct (make-instance 'fake-image :stream kbs)))
-    (test-kaitai-struct-peek-reader-builder-helper kf-struct)
-    (test-kaitai-struct-peek-reader-builder-helper kb-struct)))
+  (test-small-file #'test-kaitai-struct-peek-reader-builder-helper))
 
 (defun test-kaitai-struct-peek-reader-builder-helper (ks)
   (progn
@@ -184,36 +191,67 @@
       (testing "test-kaitai-struct-peek-reader-builder should get position correctly"
 	(ok (= (kaitai-stream:pos (slot-value ks 'kaitai-struct::ks)) 0))))))
 
-;; Test using peek-read in an attribute reader
-;; Builds the attribute reader with peek-reader-builder
-(deftest test-kaitai-struct-peek-reader-two-reads-builder
-  (let* ((filename
-	   (asdf:system-relative-pathname
-	    "kaitai-struct-clisp-runtime/tests"
-	    "tests/test-bytes-01-03.bin"))
-	 (in (open filename :direction :input :element-type '(unsigned-byte 8)))
-	 (kfs (make-instance 'kaitai-file-stream :io in))
-	 (kbs (make-instance 'kaitai-byte-stream :data #(#X01 #X02 #X03)))
-	 (kf-struct (make-instance 'fake-image :stream kfs))
-	 (kb-struct (make-instance 'fake-image :stream kbs)))
-    (test-kaitai-struct-peek-reader-builder-helper kf-struct)
-    (test-kaitai-struct-peek-reader-builder-helper kb-struct)))
+;; Test using peek-read to do two reads.
+;; We don't create a custom attribute reader.
+;; This just tests the peek-read macro to make sure it works.
+(deftest test-kaitai-struct-peek-read-two-reads
+  (test-bytes-01-08-file #'test-kaitai-struct-peek-read-two-reads-helper))
 
-(defun test-kaitai-struct-peek-reader-builder-two-reads-helper (ks)
+(defun test-kaitai-struct-peek-read-two-reads-helper (ks)
   (progn
-    (register-attribute ks 'image-width (peek-reader-builder ks 'read-u2le))
-    (let ((reader (gethash 'image-width (slot-value ks 'kaitai-struct::slot-readers))))
-      (testing "test-kaitai-struct-peek-reader-builder-two-reads should register attribute reader"
-	(ok reader)))
-    (let ((short-val (read-attribute ks 'image-width)))
-      (testing "test-kaitai-struct-peek-reader-builder-two-reads should read data"
-	(ok (= short-val #X0201)))
-      (testing "test-kaitai-struct-peek-reader-builder-two-reads should update image-width slot"
-	(ok (= (slot-value ks 'image-width) #X0201)))
-      (testing "test-kaitai-struct-peek-reader-builder-two-reads should update image-height slot"
-	(ok (= (slot-value ks 'image-height) #X0403)))
-      (testing "test-kaitai-struct-peek-reader-builder-two-reads should get position correctly"
-	(ok (= (kaitai-stream:pos (slot-value ks 'kaitai-struct::ks)) 0))))))
+    (peek-read
+	#'(lambda () (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)))
+	#'(lambda (p) (kaitai-stream:seek (slot-value ks 'kaitai-struct::ks) p))
+      (progn
+	(testing "test-kaitai-struct-peek-read-two-reads should do first read"
+	  (ok (= (read-u2le (slot-value ks 'kaitai-struct::ks)) #X0201)))
+	(testing "test-kaitai-struct-peek-read-two-reads should do second read"
+	  (ok (= (read-u2le (slot-value ks 'kaitai-struct::ks)) #X0403)))
+	(testing "test-kaitai-struct-peek-read-two-reads should have moved the stream pointer inside the peek-read"
+	  (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 4)))))
+    (testing "test-kaitai-struct-peek-read-two-reads should pop the stream position"
+      (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 0)))))
+
+;; Test using peek-read to do a read nested in another read.
+;; This just tests the peek-read macro to make sure it works.
+(deftest test-kaitai-struct-peek-read-nested-reads
+  (test-bytes-01-08-file #'test-kaitai-struct-peek-read-nested-reads-helper))
+
+(defun test-kaitai-struct-peek-read-nested-reads-helper (ks)
+  (progn
+    ;; The outer peek-read
+    (peek-read
+	#'(lambda () (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)))
+	#'(lambda (p) (kaitai-stream:seek (slot-value ks 'kaitai-struct::ks) p))
+      (progn
+	(testing "test-kaitai-struct-peek-read-two-reads should do first outer read"
+	  (ok (= (read-u2le (slot-value ks 'kaitai-struct::ks)) #X0201)))
+	;; The inner peek-read
+	;; The current stream position should be 2
+	(peek-read
+	    #'(lambda () (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)))
+	    #'(lambda (p) (kaitai-stream:seek (slot-value ks 'kaitai-struct::ks) p))
+	  (progn
+	    (testing "test-kaitai-struct-peek-read-two-reads should do inner read"
+	      (ok (= (read-u2le (slot-value ks 'kaitai-struct::ks)) #X0403)))
+	    (testing "test-kaitai-struct-peek-read-two-reads should have moved the stream pointer inside the inner peek-read"
+	      (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 4)))
+	    (testing "test-kaitai-struct-peek-read-two-reads should do inner read"
+	      (ok (= (read-u2le (slot-value ks 'kaitai-struct::ks)) #X0605)))
+	    (testing "test-kaitai-struct-peek-read-two-reads should have moved the stream pointer inside the inner peek-read"
+	      (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 6)))))
+	;; Back in the outer read, the nested read should have popped
+	;; the stream position back to 2
+	(testing "test-kaitai-struct-peek-read-two-reads should have popped the stream pointer after the inner peek-read"
+	  (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 2)))
+	(testing "test-kaitai-struct-peek-read-two-reads should do second outer read"
+	  (ok (= (read-u2le (slot-value ks 'kaitai-struct::ks)) #X0403)))
+	(testing "test-kaitai-struct-peek-read-two-reads should have moved the stream pointer inside the peek-read"
+	  (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 4)))))
+    (testing "test-kaitai-struct-peek-read-two-reads should pop the stream position"
+      (ok (= (kaitai-stream::pos (slot-value ks 'kaitai-struct::ks)) 0)))))
+
+
 
 (deftest test-kaitai-struct-dirty-slot-p
   (test-bytes-01-08-file #'test-kaitai-struct-dirty-slot-p-helper))
