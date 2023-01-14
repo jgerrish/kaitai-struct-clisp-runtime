@@ -332,10 +332,6 @@
       buf)))
 
 ;; ((ks kaitai-stream) (String encoding, int term, boolean include-term, boolean consumeTerm, boolean eosError))
-
-;; Design:
-;; We could use the built-in find or position function to find the character.
-;; But for now, the byte-at-a-time model works
 (defmethod read-bytes-term ((ks kaitai-stream)
 			    encoding term include-term consume-term eos-error)
   "Read bytes until a terminating character is reached
