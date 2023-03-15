@@ -1,7 +1,10 @@
 ;; Tests for kaitai-stream
 
 (defpackage kaitai-struct-clisp-runtime/tests/kaitai-stream
-  (:use :cl :kaitai-stream :rove))
+  (:use :cl :kaitai-stream :rove)
+  ;; Export some test functions that make loading fixtures and other
+  ;; common operations easier
+  (:export :test-full-file))
 
 (in-package :kaitai-struct-clisp-runtime/tests/kaitai-stream)
 
@@ -662,19 +665,8 @@
     (testing "test-read-bytes-full-empty should end up in the correct position"
       (ok (= (pos ks) 12)))))
 
-(deftest read-bytes-term
-  (test-full-file #'test-read-bytes-term-helper))
 
-(defun test-read-bytes-term-helper (ks)
-  (handler-case
-      (progn
-	(read-bytes-term ks "utf-8" " " t t t)
-	(testing "test-read-bytes-term should fail"
-	  (ok nil)))
-    (kaitai-stream-not-implemented-error (e)
-      (testing (format nil "read-bytes-term-helper should fail: ~a"
-		       (kaitai-stream-not-implemented-error-text e))
-	(ok t)))))
+;; read-bytes-term test is in kaitai-stream-read-bytes-term.lisp
 
 (deftest ensure-fixed-contents
   (test-full-file #'test-ensure-fixed-contents-helper))
@@ -808,7 +800,7 @@
       (progn
 	(kaitai-stream-mod (make-instance 'kaitai-stream) #())
 	(testing "test-kaitai-stream-mod should fail"
-	  (ok nil)))
+		 (ok nil)))
     (kaitai-stream-not-implemented-error (e)
       (testing (format nil "test-kaitai-stream-mod should fail: ~a"
 		       (kaitai-stream-not-implemented-error-text e))

@@ -7,6 +7,13 @@
 ;; Parsing negative infinity values is not working
 ;; (push :floating-point cl:*features*)
 
+;; Disable unicode support for now
+;; (push :kaitai-unicode cl:*features*)
+
+;; Developers interested in adding support for Unicode should look at
+;; the read-next-term method in the kaitai-stream class.  Help is
+;; welcome.
+
 ;; system definition for the runtime, including the base kaitai-stream
 ;; and kaitai-struct classes.
 (defsystem "kaitai-struct-clisp-runtime"
@@ -32,6 +39,7 @@
                 :components
                 ((:file "utils")
 		 (:file "kaitai-stream")
+		 (:file "kaitai-stream-read-bytes-term")
 		 (:file "kaitai-struct"))))
   :description "Test system for kaitai-struct-clisp-runtime"
   :perform (test-op (op c) (symbol-call :rove :run c)))

@@ -2,6 +2,7 @@
   (:use :cl)
   (:export
    :kaitai-stream :kaitai-stream-eof-error :kaitai-stream-not-implemented-error
+   :kaitai-stream-unsupported-encoding-error :kaitai-stream-unsupported-encoding-error-text
    :kaitai-stream-eof-error-text :kaitai-stream-not-implemented-error-text
    :kaitai-file-stream :kaitai-byte-stream
    :seek :pos :eof-p :size
@@ -33,6 +34,10 @@
 ;; A basic error indicating that a function isn't implemented
 (define-condition kaitai-stream-not-implemented-error (error)
   ((text :initarg :text :reader kaitai-stream-not-implemented-error-text)))
+
+;; An error that the supplied encoding specifier is currently not supported
+(define-condition kaitai-stream-unsupported-encoding-error (error)
+  ((text :initarg :text :reader kaitai-stream-unsupported-encoding-error-text)))
 
 ;; A subclass using files as a backing store
 (defclass kaitai-file-stream (kaitai-stream)
@@ -331,7 +336,68 @@
       (setf (slot-value ks 'index) (+ index (length buf)))
       buf)))
 
-;; ((ks kaitai-stream) (String encoding, int term, boolean include-term, boolean consumeTerm, boolean eosError))
+
+;; Convert a string to lowercase
+;; Uses unicode on SBCL systems if the kaitai-unicode feature is set
+;; Otherwise uses format strings
+(defun lowercase (s)
+  "Convert a string to lowercase"
+  #+(and kaitai-unicode sbcl) (sb-unicode:lowercase s)
+  #-(and kaitai-unicode sbcl) (format nil "~(~a~)" s))
+
+;; Read in the next term from the stream with a given encoding
+;;
+;; Not using pattern matching, attempting to reduce the number of
+;; libraries we require.  The Common LISP Cookbook recommends Trivia
+;; as a standard for pattern matching.
+;;
+;; Some notes on the encodings chosen:
+;;
+;;       Here's a rough breakdown on the encodings found in
+;;       kaitai_struct_formats files (ignoring case, combining similar
+;;       ones, etc) (data is from 2023-02-09):
+;;         ascii: 113, utf-8: 103, utf-16le: 7, utf-16be: 3, iso8859-1: 2
+;;
+;; Some formats have mixed encoding, for example Mach-O exectuables:
+;; executable/mach_o.ksy
+;; So simply opening the file with a single external-format specifier
+;; isn't enough.  We need to switch between formats as we read.
+;; The Rust runtime provides support for this.
+;; This runtime does not yet.
+;; Some of the Common LISP libraries that provide support for this
+;; include FLEXI-STREAMS: https://github.com/edicl/flexi-streams/
+(defmethod read-next-term ((ks kaitai-stream) encoding)
+  (let ((lc-encoding (lowercase encoding)))
+    (let ((external-format
+	    (cond
+	      ((string= lc-encoding "ascii") :ASCII)
+	      ((string= lc-encoding "utf-8") :UTF-8)
+	      ((string= lc-encoding "utf-16le") :UTF-16LE)
+	      ((string= lc-encoding "utf-16be") :UTF-16BE)
+	      ((string= lc-encoding "iso8859-1") :ISO8859-1))))
+      (if (equal external-format :ASCII)
+	  (read-kaitai-stream-byte ks)
+	  ;; Currently, every other encoding is not supported
+	  (error 'kaitai-stream-unsupported-encoding-error
+		 :text (format nil "unsupported encoding: ~a" external-format))))))
+
+;; Read bytes from the stream until a certain term is found or the
+;; end-of-stream is reached.
+;;
+;; Some details on behavior with the ambiguous specification:
+;;
+;; If the terminal isn't found in the stream, the stream is advanced
+;; until EOS.  This matches behavior in the Java and Python runtimes.
+;; If other behavior is desired, push the stream position before
+;; calling this and pop it after.
+;;
+;;
+;; The only encoding currently supported is ASCII
+;; If the encoding is not supported, the stream isn't advanced at all.
+;;
+;; See the method read-next-term for some pointers on libraries or why
+;; simply setting the external-encoding when we open the file isn't
+;; enough.
 (defmethod read-bytes-term ((ks kaitai-stream)
 			    encoding term include-term consume-term eos-error)
   "Read bytes until a terminating character is reached
@@ -340,11 +406,35 @@
    - include-term is a boolean indicating whether the terminating
      character should be included in the returned buffer.
    - consume-term is a boolean indicating whether the terminating character should be
-     consumed or left in the stream
+     consumed or left in the stream.
    - eos-error is a boolean indicating whether an exception should be raised if no
      terminating character is found."
-  (error 'kaitai-stream-not-implemented-error
-	 :text "not implemented"))
+  ;; Create a growable results vector.  We add bytes to it as we iterate over the stream.
+  (let ((result (make-array (size ks) :fill-pointer 0)))
+    (do ((cur (read-next-term ks encoding) (read-next-term ks encoding)))
+	;; The condition for the end test: either end of stream or the term was found
+	;; Due to the way EOF is handled, both can be true.  EOF is set when the last byte
+	;; is read.
+	((or (eof-p ks) (equal (code-char cur) term))
+	 (if (equal (code-char cur) term)
+	     ;; The term was found
+	     (progn
+	       (if include-term
+		   (vector-push cur result))
+	       (if (not consume-term)
+		   ;; TODO: Add edge case tests
+		   (seek ks (1- (pos ks))))
+	       result)
+	     ;; The term was not found, end of stream reached
+	     (progn
+	       (vector-push cur result)
+	       (if eos-error
+		   (error 'kaitai-stream-eof-error
+			  :text
+			  (format
+			   nil "end of stream reached, but no terminator ~a found" term))
+		 result))))
+      (vector-push cur result))))
 
 (defmethod ensure-fixed-contents ((ks kaitai-stream) expected)
   (error 'kaitai-stream-not-implemented-error
