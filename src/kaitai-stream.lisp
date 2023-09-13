@@ -3,6 +3,7 @@
   (:export
    :kaitai-stream :kaitai-stream-eof-error :kaitai-stream-not-implemented-error
    :kaitai-stream-eof-error-text :kaitai-stream-not-implemented-error-text
+   :kaitai-stream-validation-not-equal-error :kaitai-stream-validation-not-equal-error-text
    :kaitai-file-stream :kaitai-byte-stream
    :seek :pos :eof-p :size
    :sign-bit :read-signed
@@ -29,6 +30,10 @@
 ;; of a stream
 (define-condition kaitai-stream-eof-error (error)
   ((text :initarg :text :reader kaitai-stream-eof-error-text)))
+
+;; An error indicating that ensure-fixed-contents match failed
+(define-condition kaitai-stream-validation-not-equal-error (error)
+  ((text :initarg :text :reader kaitai-stream-validation-not-equal-error-text)))
 
 ;; A basic error indicating that a function isn't implemented
 (define-condition kaitai-stream-not-implemented-error (error)
@@ -347,8 +352,25 @@
 	 :text "not implemented"))
 
 (defmethod ensure-fixed-contents ((ks kaitai-stream) expected)
-  (error 'kaitai-stream-not-implemented-error
-	 :text "not implemented"))
+  "Compare the expected n bytes with the next n bytes from the stream
+
+  - If the next n bytes matches the expected n bytes, return the
+    buffer.
+  - If the next n bytes don't match the expected n bytes,
+    return a kaitai-stream-validation-not-equal-error error.
+
+  What happens if the expected stream is longer than the remaining bytes?
+  We could either raise a kaitai-stream-eof-error or a kaitai-stream-validation-not-equal-error
+  We'll raise a kaitai-stream-validation-not-equal-error."
+  ;; Check for the condition where expected is longer than remaining
+  (if (> (length expected) (- (size ks) (pos ks)))
+	(error 'kaitai-stream-validation-not-equal-error
+	       :text "Actual does not equal expected")
+	(let ((buf (read-bytes ks (length expected))))
+	  (if (mismatch buf expected)
+	      (error 'kaitai-stream-validation-not-equal-error
+		     :text "Actual does not equal expected")
+	      buf))))
 
 (defun bytes-strip-right (bytes pad-byte)
   (error 'kaitai-stream-not-implemented-error

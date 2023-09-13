@@ -33,6 +33,9 @@ runtime.  You may need to include (ql:quickload
 "kaitai-struct-clisp-runtime") if you use quicklisp or make it
 available somewhere your Common LISP system can find it.
 
+For quicklisp, cloning kaitai-struct-clisp-runtime into
+~/quicklisp/local-projects makes it discoverable by ql:quickload.
+
 
 ## Installation
 

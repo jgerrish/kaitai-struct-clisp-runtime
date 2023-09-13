@@ -676,19 +676,101 @@
 		       (kaitai-stream-not-implemented-error-text e))
 	(ok t)))))
 
-(deftest ensure-fixed-contents
-  (test-full-file #'test-ensure-fixed-contents-helper))
 
-(defun test-ensure-fixed-contents-helper (ks)
+;; Test ensure-fixed-contents
+
+
+;; This tests that the next n bytes match some expected n bytes
+
+(deftest ensure-fixed-contents-matches-works
+  (test-full-file #'test-ensure-fixed-contents-matches-helper))
+
+(defun test-ensure-fixed-contents-matches-helper (ks)
+  (let ((actual (ensure-fixed-contents
+		 ks
+		 #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21))))
+    (testing "test-ensure-fixed-contents should succeed"
+      (ng (mismatch actual #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21))))))
+
+
+;; This tests that the next n bytes match some expected n bytes
+;; This tests the case where we read some bytes first, then call ensure-fixed-contents
+
+(deftest ensure-fixed-contents-after-read-matches-works
+  (test-full-file #'test-ensure-fixed-contents-after-read-matches-helper))
+
+(defun test-ensure-fixed-contents-after-read-matches-helper (ks)
+  (progn
+    (read-bytes ks 2)
+    (let ((actual (ensure-fixed-contents
+		   ks
+		   #(#X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21))))
+      (testing "test-ensure-fixed-contents after a partial read should succeed"
+	(ng (mismatch actual #(#X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21)))))))
+
+
+;; This tests that the next n bytes match some expected n bytes
+;; If they don't match, an error should be thrown
+
+(deftest ensure-fixed-contents-doesnt-match-throws
+  (test-full-file #'test-ensure-fixed-contents-doesnt-match-helper))
+
+(defun test-ensure-fixed-contents-doesnt-match-helper (ks)
   (handler-case
-      (progn
-	(ensure-fixed-contents ks 0)
-	(testing "test-ensure-fixed-contents should fail"
+      (let ((actual (ensure-fixed-contents
+		     ks
+		     #(#X48 #X65 #X6C #X6C #X6F #X20 #X56 #X6F #X72 #X6C #X64 #X21))))
+	(testing "test-ensure-fixed-contents with wrong expected should not succeed"
 	  (ok nil)))
-    (kaitai-stream-not-implemented-error (e)
-      (testing (format nil "ensure-fixed-contents-helper should fail: ~a"
-		       (kaitai-stream-not-implemented-error-text e))
+    (kaitai-stream-validation-not-equal-error (e)
+      (testing (format nil "test-ensure-fixed-contents with wrong expected should throw error: ~a"
+		       (kaitai-stream-validation-not-equal-error-text e))
 	(ok t)))))
+
+;; This tests that the next n bytes match some expected n bytes
+;; If an end-of-file is reached before matching, it should also throw an
+;; kaitai-stream-validation-not-equal-error
+
+(deftest ensure-fixed-contents-eof-throws
+  (test-full-file #'test-ensure-fixed-contents-eof-helper))
+
+(defun test-ensure-fixed-contents-eof-helper (ks)
+  (handler-case
+      (let ((actual (ensure-fixed-contents
+		     ks
+		     #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21 #XD3))))
+	(testing "test-ensure-fixed-contents with too long expected should not succeed"
+	  (ok nil)))
+    (kaitai-stream-validation-not-equal-error (e)
+      (testing (format nil "test-ensure-fixed-contents with too long expected should throw error: ~a"
+		       (kaitai-stream-validation-not-equal-error-text e))
+	(ok t)))))
+
+
+;; This tests that the next n bytes match some expected n bytes
+;; This tests the case where we read some bytes into the stream first
+;;
+;; If an end-of-file is reached before matching, it should also throw an
+;; kaitai-stream-validation-not-equal-error
+
+(deftest ensure-fixed-contents-after-read-eof-throws
+  (test-full-file #'test-ensure-fixed-contents-after-read-eof-helper))
+
+(defun test-ensure-fixed-contents-after-read-eof-helper (ks)
+  (progn
+    (read-bytes ks 2)
+    (handler-case
+	(let ((actual (ensure-fixed-contents
+		       ks
+		       #(#X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21 #XD3))))
+	  (testing "test-ensure-fixed-contents after a partial read with too long expected should not succeed"
+	    (ok nil)))
+      (kaitai-stream-validation-not-equal-error (e)
+	(testing (format nil "test-ensure-fixed-contents after a partial read with too long expected should throw error: ~a"
+			 (kaitai-stream-validation-not-equal-error-text e))
+	  (ok t))))))
+
+
 
 ;; Test bytes-strip-right
 
