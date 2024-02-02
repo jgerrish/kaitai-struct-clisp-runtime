@@ -373,8 +373,42 @@
 	      buf))))
 
 (defun bytes-strip-right (bytes pad-byte)
-  (error 'kaitai-stream-not-implemented-error
-	 :text "not implemented"))
+  "Strip all the pad-byte bytes from the end of bytes
+
+   This function strips all the bytes at the end of bytes that match pad-byte."
+  ;; This function is based on generic-string-trim in SBCL
+  ;; It's simplified to not be generic, only have one padding
+  ;; byte and only trim the right.
+  ;;
+  ;; This function operates on bytes in a vector, not "characters" in
+  ;; a string.
+  ;;
+  ;; This is a deliberate design choice based on the name of the
+  ;; function, the behavior of other runtimes, and the common
+  ;; use-cases and format files.
+  ;;
+  ;; This function is named bytes-strip-right, not unicode-strip-right
+  ;; or string-strip-right.
+  ;;
+  ;; Hopefully my usage is consistent in other functions, but there
+  ;; may be confusion with this and read-bytes-term or other functions
+  ;; that use an encoding.
+  (let ((end (length bytes))
+	(left-end 0))			; unnecessary, but helps reading the code
+    (let ((right-end
+	   (do ((index (1- end) (1- index)))
+	       ((or (< index left-end)
+		    (not (= pad-byte (aref bytes index))))
+		(1+ index)))))
+      (if (eql right-end end)
+	  bytes
+	  ;; subseq returns a subsequence from the list
+	  ;; the first parameter is the list
+	  ;; the second parameter is the start of the subsequence
+	  ;; (zero-based, inclusive)
+	  ;; the third parameter is the end of the subsequence (zero-based,
+	  ;; exclusive)
+	  (subseq bytes 0 right-end)))))
 
 (defun bytes-terminate (bytes term include-term)
   (error 'kaitai-stream-not-implemented-error

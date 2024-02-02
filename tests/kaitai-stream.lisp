@@ -771,19 +771,101 @@
 	  (ok t))))))
 
 
-
 ;; Test bytes-strip-right
 
-(deftest test-bytes-strip-right
+;; Test for no occurrences at end of stream
+;; It should return the original byte vector
+(deftest test-bytes-strip-right-no-matches
+    (test-full-file #'test-bytes-strip-right-no-matches-helper))
+
+(defun test-bytes-strip-right-no-matches-helper (ks)
   (handler-case
       (progn
-	(bytes-strip-right #() nil)
-	(testing "test-bytes-strip-right should fail"
-	  (ok nil)))
-    (kaitai-stream-not-implemented-error (e)
-      (testing (format nil "test-bytes-strip-right should fail: ~a"
-		       (kaitai-stream-not-implemented-error-text e))
-	(ok t)))))
+	(let ((res (bytes-strip-right (read-bytes-full ks) #X41)))
+	  (testing "test-bytes-strip-right with no matches should return the original bytes"
+	    (ng
+	     (mismatch res #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21))))))))
+
+;; Test for one occurrence at end of stream
+;; It should return the byte vector minus the last byte
+(deftest test-bytes-strip-right
+    (test-full-file #'test-bytes-strip-right-helper))
+
+(defun test-bytes-strip-right-helper (ks)
+  (handler-case
+      (progn
+	(let ((res (bytes-strip-right (read-bytes-full ks) #X21)))
+	  (testing "test-bytes-strip-right with one pad character should strip it"
+	    (ng
+	     (mismatch res #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64))))))))
+
+
+;; Test for two occurences at end of stream
+;; It should return the byte sequence minus the last two bytes
+(deftest test-bytes-strip-right-two-matches
+  (let ((ks (make-instance 'kaitai-byte-stream
+			   :data #(#X48 #X65 #X6C #X6C #X6F
+				   #X20 #X57 #X6F #X72 #X6C #X64 #X21 #X21))))
+  (handler-case
+      (progn
+	(let ((res (bytes-strip-right (read-bytes-full ks) #X21)))
+	  (testing "test-bytes-strip-right with two pad characters should strip them both"
+	    (ng
+	     (mismatch res #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64)))))))))
+
+;; Test for one occurence at start of stream
+;; It should return the original byte vector
+(deftest test-bytes-strip-right-matches-left
+    (test-full-file #'test-bytes-strip-right-matches-left-helper))
+
+(defun test-bytes-strip-right-matches-left-helper (ks)
+  (handler-case
+      (progn
+	(let ((res (bytes-strip-right (read-bytes-full ks) #X48)))
+	  (testing "test-bytes-strip-right with one pad character at the beginning (with following bytes) should ignore it"
+	    (ng
+	     (mismatch res #(#X48 #X65 #X6C #X6C #X6F #X20 #X57 #X6F #X72 #X6C #X64 #X21))))))))
+
+
+;; Test with an empty stream
+;; It should return the original byte sequence (an empty vector)
+(deftest test-bytes-strip-right-empty-file
+    (test-empty-file #'test-bytes-strip-right-empty-file-helper))
+
+(defun test-bytes-strip-right-empty-file-helper (ks)
+  (handler-case
+      (progn
+	(let ((res (bytes-strip-right (read-bytes-full ks) #X48)))
+	  (testing "test-bytes-strip-right with an empty byte stream should return an empty byte stream"
+	    (ng (mismatch res #())))))))
+
+
+;; Test with matching on one byte on a one byte length stream
+;; It should return an empty vector.
+(deftest test-bytes-strip-right-one-byte-file
+  (let ((ks (make-instance 'kaitai-byte-stream
+			   :data #(#X48))))
+    (handler-case
+	(progn
+	  (let ((res (bytes-strip-right (read-bytes-full ks) #X48)))
+	    (testing "test-bytes-strip-right with two pad characters should strip them both"
+	      (ng
+	       (mismatch res #()))))))))
+
+
+;; Test with matching on one byte on a one byte length stream
+;; It should return an the original bytes.
+(deftest test-bytes-strip-right-one-byte-no-match-file
+  (let ((ks (make-instance 'kaitai-byte-stream
+			   :data #(#X48))))
+    (handler-case
+	(progn
+	  (let ((res (bytes-strip-right (read-bytes-full ks) #X21)))
+	    (testing "test-bytes-strip-right with two pad characters should strip them both"
+	      (ng
+	       (mismatch res #(#X48)))))))))
+
+
 
 ;; Test bytes-terminate
 
