@@ -411,8 +411,29 @@
 	  (subseq bytes 0 right-end)))))
 
 (defun bytes-terminate (bytes term include-term)
-  (error 'kaitai-stream-not-implemented-error
-	 :text "not implemented"))
+  "Copy from bytes up to the terminating character,
+   possibly including the terminating character.
+
+   - bytes is the byte vector to copy from
+   - term is the terminating byte
+   - include-term is a boolean indicating whether the terminating byte
+     should be included.
+
+   Since bytes is an array of bytes, the terminating byte is
+   treated as an 8-bit integer, not a character.
+   An exact numeric match is searched for.
+
+   The first occurrence of the terminating byte is used,
+   additional matches are ignored.
+
+   If the terminating byte isn't found,
+   the entire original byte vector is returned."
+  (let ((term-byte-pos (position term bytes)))
+    (if term-byte-pos
+	(if include-term
+	    (subseq bytes 0 (1+ term-byte-pos))
+	    (subseq bytes 0 term-byte-pos))
+	bytes)))
 
 (defun bytes-to-str (bytes encoding)
   (error 'kaitai-stream-not-implemented-error

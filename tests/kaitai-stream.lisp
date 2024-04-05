@@ -870,15 +870,52 @@
 ;; Test bytes-terminate
 
 (deftest test-bytes-terminate
-  (handler-case
-      (progn
-	(bytes-terminate #() 0 nil)
-	(testing "test-bytes-terminate should fail"
-	  (ok nil)))
-    (kaitai-stream-not-implemented-error (e)
-      (testing (format nil "test-bytes-terminate should fail: ~a"
-		       (kaitai-stream-not-implemented-error-text e))
-	(ok t)))))
+    (handler-case
+	(progn
+	  (testing "empty byte vector not including term should return empty byte vector"
+	    (ng (mismatch (bytes-terminate #() 0 nil) #())))
+	  (testing "empty byte vector including term should return empty byte vector"
+	    (ng (mismatch (bytes-terminate #() 0 t) #())))
+	  (testing "one byte vector without match not including term should return original byte vector"
+	    (ng (mismatch (bytes-terminate #(#X68) #X67 nil) #(#X68))))
+	  (testing "one byte vector with match not including term should return empty byte vector"
+	    (ng (mismatch (bytes-terminate #(#X68) #X68 nil) #())))
+	  (testing "one byte vector without match including term should return original byte vector"
+	    (ng (mismatch (bytes-terminate #(#X68) #X67 t) #(#X68))))
+	  (testing "one byte vector with match including term should return match byte in byte vector"
+	    (ng (mismatch (bytes-terminate #(#X68) #X68 t) #(#X68))))
+	  (testing "multi byte vector with match not including term should return up to but not including match byte"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X6C nil)
+		 #(#X68 #X65))))
+	  (testing "multi byte vector with match including term should return up to and including match byte"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X6C t)
+		 #(#X68 #X65 #X6C))))
+	  (testing "multi byte vector without match not including term should return original byte vector"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X6D nil)
+		 #(#X68 #X65 #X6C #X6C #X6F))))
+	  (testing "multi byte vector without match including term should return original byte vector"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X6D t)
+		 #(#X68 #X65 #X6C #X6C #X6F))))
+	  (testing "multi byte vector with match on first byte not including term should return empty byte vector"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X68 nil)
+		 #())))
+	  (testing "multi byte vector with match on first byte including term should return first byte"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X68 t)
+		 #(#X68))))
+	  (testing "multi byte vector with match on last byte not including term should return up to but not including the last byte"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X6F nil)
+		 #(#X68 #X65 #X6C #X6C))))
+	  (testing "multi byte vector with match on last byte including term should return entire byte vector"
+	    (ng (mismatch
+		 (bytes-terminate #(#X68 #X65 #X6C #X6C #X6F) #X6F t)
+		 #(#X68 #X65 #X6C #X6C #X6F)))))))
 
 ;; Test bytes-to-str
 
