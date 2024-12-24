@@ -51,18 +51,104 @@ asd file to be found:
 [https://asdf.common-lisp.dev/asdf/Configuring-ASDF-to-find-your-systems.html](Configuring-ASDF-to-find-your-systems "Configuring ASDF to find your systems")
 
 
-The system was created with the following commands:
-
-(load "quicklisp/quicklisp.lisp")
-(ql:quickload "cl-project")
-(cl-project:make-project #P"quicklisp/local-projects/kaitai-struct-clisp-runtime")
-
-Users who are familiar with ASDF should know how to use it in their
-projects.
-
 To enter the system:
 
 (in-package :kaitai-struct-clisp-runtime)
+
+
+## Example
+
+This section runs through creating a simple hello world application.
+
+Copy the following content into a file called hello_world.ksy:
+
+
+meta:
+  id: hello_world
+  application: A sample hello world binary file for testing
+  endian: le
+doc: |
+  A sample hello world binary file for testing.
+  Right now it only consists of a single byte followed by a little-endian short.
+doc-ref: https://github.com/jgerrish/kaitai_struct_compiler.git
+seq:
+  - id: one
+    type: u1
+  - id: two
+    type: u2
+
+Create a simple example file: hello_world_data.bin
+
+You can evalute the following in Emacs with C-c C-c, it will create a
+file called hello_world_data.bin in your current directory.
+
+#+BEGIN_SRC sh :exports :results value file :file hello_world_data.bin :shebang #!/bin/sh
+  echo -en "\x00\x01\x02\x04"
+#+END_SRC
+
+#+RESULTS:
+[[file:hello_world_data.bin]]
+
+
+Generate runtime code:
+
+In the kaitai_struct_compiler directory, run the Scala Build Tool (sbt):
+
+$ sbt
+
+Then after it loads, run the following command:
+
+fgRun --target clisp "hello_world.ksy"
+
+This will generate a file called hello-world.lisp
+
+A quick note about underscores, hyphens and dashes and naming
+conventions.  Up until now we've been using underscores because that's
+what the Kaitai project standardized on.  But LISP uses hyphens, so
+the filename for the LISP code will use a hyphen and the code
+generated will use hyphens.
+
+
+Then start up your LISP system and load in the runtime and generated
+code:
+
+If you're using Quicklisp, SLIME and SBCL:
+
+CL-USER> (ql:quickload :kaitai-struct-clisp-runtime)
+
+Then load the hello-world.lisp code:
+
+(load "hello-world.lisp")
+
+You may need to add a relative or absolute path to the file.
+
+The example runtime runner below uses inline data instead of the file
+generated earlier.
+
+
+#+NAME: run-it-byte-stream
+#+BEGIN_SRC common-lisp :tangle run.lisp
+  (defun run-it-byte-stream ()
+    (let* ((kbs (make-instance 'kaitai-stream::kaitai-byte-stream
+			       :data #(#X00 #X01 #X02 #X04)))
+	   (hw (make-instance 'hello-world :stream kbs)))
+      hw))
+#+END_SRC
+
+Running that code block should parse the binary file and return the
+value 513.
+
+Here is the same code but using the external file:
+
+#+NAME: run-it-file-stream
+#+BEGIN_SRC common-lisp :tangle run-it-file-stream.lisp
+  (defun run-it-file-stream ()
+    (let* ((filename "test.bin")
+	   (in (open filename :direction :input :element-type '(unsigned-byte 8)))
+	   (kfs (make-instance 'kaitai-stream::kaitai-file-stream :io in))
+	   (hw (make-instance 'hello-world :stream kfs)))
+      hw))
+#+END_SRC
 
 
 ## Development
@@ -99,6 +185,19 @@ return it.
 To run tests:
 
 (asdf:test-system :kaitai-struct-clisp-runtime)
+
+
+## Original Steps to Create Runtime Project Skeleton
+
+The system was created with cl-project and the following commands:
+
+(load "quicklisp/quicklisp.lisp")
+(ql:quickload "cl-project")
+(cl-project:make-project #P"quicklisp/local-projects/kaitai-struct-clisp-runtime")
+
+Users who are familiar with ASDF should know how to use it in their
+projects.
+
 
 ## Links
 
